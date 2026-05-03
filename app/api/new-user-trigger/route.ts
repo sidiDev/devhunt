@@ -23,7 +23,7 @@ export async function POST(req: Request) {
 
     const { email, full_name } = user_metadata;
 
-    await fetch('https://xuqkmyeuqfvucdo6gupjh7x6df8ohj6b.saasemailer.com/api/v1/devhunt.org/contacts/create', {
+    await fetch('https://xuqkmyeuqfvucdo6gupjh7x6df8ohj6b.saasemailer.com/api/v1/devhunt.org/contacts/create/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
       }),
     });
 
-    await fetch('https://xuqkmyeuqfvucdo6gupjh7x6df8ohj6b.saasemailer.com/api/v1/devhunt.org/contacts/create', {
+    await fetch('https://xuqkmyeuqfvucdo6gupjh7x6df8ohj6b.saasemailer.com/api/v1/devhunt.org/contacts/create/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
