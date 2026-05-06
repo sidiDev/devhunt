@@ -1204,7 +1204,7 @@ export default `
                                                             font-weight: normal;
                                                             text-decoration: underline;
                                                           "
-                                                          href="{{unsubscribeLink}}?redirectTo=https://devhunt.org/newsletter/unsubscribe"
+                                                          href="{{unsubscribeLink}}&redirectTo=https://devhunt.org/newsletter/unsubscribe"
                                                           >Unsubscribe</a
                                                         >
                                                       </p></span
