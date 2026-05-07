@@ -1,10 +1,10 @@
 import moment from 'moment';
 import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
 import ProductsService from '@/utils/supabase/services/products';
 import { upvoteLogsService } from '@/utils/supabase/services/upvoteCommenLogs';
 import { createBrowserClient } from '@/utils/supabase/browser';
-import Mergent from 'mergent';
+import upvoteNotificationEmailTemplate from '@/utils/email-templates/upvote-notification-email-template';
+import { Resend } from 'resend';
 
 type IVote = {
   product: {
@@ -21,60 +21,33 @@ type IVote = {
   };
 };
 
-// Get the token that will be passed to the email api as a token.
-async function getAuthToken() {
-  let data = JSON.stringify({
-    Organization: 'devhunt',
-    User: 'apiuser',
-    Password: process.env.AUTH_TOKEN_PASSWORD,
-  });
-
-  let config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: 'https://apinie.sensorpro.net/auth/sys/signin',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-apikey': process.env.AUTH_TOKEN_API_KEY,
-    },
-    data: data,
-  };
-
-  return await axios.request(config);
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
-async function sendNotification(email: string, slug: string, product_name: string, commenter: string, token: string) {
-  try {
-    const response = await axios.post(
-      `https://apinie.sensorpro.net/api/Campaign/TriggerEmail/${token}`,
-      {
-        CampId: 'eaa0d0ff-6367-46c7-a464-94abd837ac31',
-        BroadcastId: 2,
-        Delay: 0,
-        ContactData: {
-          PersonalEMail: email,
-        },
-        NamedPairsParameters: {
-          toolname: product_name,
-          link: `devhunt.org/tool/${slug}`,
-          author: commenter,
-        },
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      },
-    );
+function buildUpvoteEmailHtml(params: { productName: string; voterName: string; toolUrl: string }): string {
+  const preheader = `${params.voterName} upvoted ${params.productName} on DevHunt.`;
+  return upvoteNotificationEmailTemplate
+    .replace(/\{\{preheader\}\}/g, escapeHtml(preheader))
+    .replace(/\{\{productName\}\}/g, escapeHtml(params.productName))
+    .replace(/\{\{voterName\}\}/g, escapeHtml(params.voterName))
+    .replace(/\{\{toolUrl\}\}/g, params.toolUrl)
+    .replace(/\{\{unsubscribeUrl\}\}/g, 'https://devhunt.org/newsletter/unsubscribe');
+}
 
-    // console.log(JSON.stringify(response.data));
-  } catch (error) {
-    console.error(error);
+export async function POST(_request: NextRequest) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error('upvote-notification: RESEND_API_KEY is not set');
+    return NextResponse.json({ success: false, error: 'Email not configured' }, { status: 500 });
   }
-}
 
-export async function POST(request: NextRequest) {
-  const getToken = (await getAuthToken()).data.Token;
+  const resend = new Resend(apiKey);
 
   console.log('Upvote notification Works');
 
@@ -86,18 +59,38 @@ export async function POST(request: NextRequest) {
   const groups = await productsService.getUpvotesGroupedByProducts(dayAgo);
 
   if ((await initUpvoteLogsService.getTodayLog()).length == 0) {
-    const sentEmails = new Set();
-    groups.forEach(item => {
+    const sentEmails = new Set<string>();
+    const sendTasks: Promise<unknown>[] = [];
+
+    for (const item of groups) {
       const voteItem = item as IVote;
       const email = voteItem.product.profiles.email;
       const userProfile = voteItem.voter_data;
       if (!sentEmails.has(email) && voteItem.product.profiles.id != userProfile.id) {
         const { name, slug } = item.product;
+        const toolUrl = `https://devhunt.org/tool/${slug}`;
+        const html = buildUpvoteEmailHtml({
+          productName: name as string,
+          voterName: userProfile.full_name || 'Someone',
+          toolUrl,
+        });
+        const to =
+          process.env.NODE_ENV === 'development' ? ['sididev3@gmail.com', 'nazar@marsx.dev'] : email;
 
-        sendNotification(email, slug as string, name as string, userProfile.full_name, getToken);
+        sendTasks.push(
+          resend.emails.send({
+            from: 'DevHunt <hey@devhunt.org>',
+            to,
+            subject: `New upvote on ${name} · DevHunt`,
+            replyTo: 'hey@devhunt.org',
+            html,
+          }),
+        );
         sentEmails.add(email);
       }
-    });
+    }
+
+    await Promise.all(sendTasks);
 
     await initUpvoteLogsService.insertUpvoteLogs({ upvotes_number: groups.length, emails_sent: sentEmails.size });
   }
