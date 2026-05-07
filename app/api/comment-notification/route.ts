@@ -1,14 +1,13 @@
 import CommentService from '@/utils/supabase/services/comments';
 import moment from 'moment';
 import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
 import { commentLogsService } from '@/utils/supabase/services/upvoteCommenLogs';
 import { createBrowserClient } from '@/utils/supabase/browser';
-import Mergent from 'mergent';
+import commentNotificationEmailTemplate from '@/utils/email-templates/comment-notification-email-template';
+import { Resend } from 'resend';
 
 type Icomment = {
   product: {
-    // Owner Data
     name: string;
     slug: string;
     profiles: {
@@ -25,62 +24,49 @@ type Icomment = {
   }[];
 };
 
-// Get the token that will be passed to the email api as a token.
-async function getAuthToken() {
-  let data = JSON.stringify({
-    Organization: 'devhunt',
-    User: 'apiuser',
-    Password: process.env.AUTH_TOKEN_PASSWORD,
-  });
-
-  let config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: 'https://apinie.sensorpro.net/auth/sys/signin',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-apikey': process.env.AUTH_TOKEN_API_KEY,
-    },
-    data: data,
-  };
-
-  return await axios.request(config);
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
-async function sendNotification(email: string, slug: string, product_name: string, commenter: string, comment: string, token: string) {
-  try {
-    const response = await axios.post(
-      `https://apinie.sensorpro.net/api/Campaign/TriggerEmail/${token}`,
-      {
-        CampId: 'eaa0d0ff-6367-46c7-a464-94abd837ac31',
-        BroadcastId: 1,
-        Delay: 0,
-        ContactData: {
-          PersonalEMail: email,
-        },
-        NamedPairsParameters: {
-          toolname: product_name,
-          link: `devhunt.org/tool/${slug}#comments`,
-          author: commenter,
-          comment,
-          commentlink: `devhunt.org/tool/${slug}#comments`,
-        },
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      },
-    );
+function truncateComment(text: string, max = 320): string {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1)}…`;
+}
 
-    // console.log(JSON.stringify(response.data));
-  } catch (error) {
-    console.error(error);
+function formatCommentForEmail(text: string): string {
+  return escapeHtml(truncateComment(text)).replace(/\r\n|\r|\n/g, '<br />');
+}
+
+function buildCommentEmailHtml(params: {
+  productName: string;
+  commenterName: string;
+  commentPreview: string;
+  toolUrl: string;
+}): string {
+  const preheader = `${params.commenterName} commented on ${params.productName} — jump in on DevHunt.`;
+  return commentNotificationEmailTemplate
+    .replace(/\{\{preheader\}\}/g, escapeHtml(preheader))
+    .replace(/\{\{productName\}\}/g, escapeHtml(params.productName))
+    .replace(/\{\{commenterName\}\}/g, escapeHtml(params.commenterName))
+    .replace(/\{\{commentPreview\}\}/g, params.commentPreview)
+    .replace(/\{\{toolUrl\}\}/g, params.toolUrl)
+    .replace(/\{\{unsubscribeUrl\}\}/g, 'https://devhunt.org/newsletter/unsubscribe');
+}
+
+export async function POST(_request: NextRequest) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error('comment-notification: RESEND_API_KEY is not set');
+    return NextResponse.json({ success: false, error: 'Email not configured' }, { status: 500 });
   }
-}
 
-export async function POST(request: NextRequest) {
-  const getToken = (await getAuthToken()).data.Token;
+  const resend = new Resend(apiKey);
 
   console.log('Comments notification Works');
 
@@ -92,18 +78,41 @@ export async function POST(request: NextRequest) {
   const groups = await commentService.getCommentsGroupedByProducts(dayAgo);
 
   if ((await initCommentLogsService.getTodayLog()).length == 0) {
-    const sentEmails = new Set();
-    groups.forEach(item => {
+    const sentEmails = new Set<string>();
+    const sendTasks: Promise<unknown>[] = [];
+
+    for (const item of groups) {
       const commentItem = item as Icomment;
       const email = commentItem.product.profiles.email;
       const userProfile = commentItem.comments[0].profiles;
       if (!sentEmails.has(email) && commentItem.product.profiles.id != userProfile.id) {
         const { name, slug } = item.product;
+        const toolUrl = `https://devhunt.org/tool/${slug}#comments`;
+        const html = buildCommentEmailHtml({
+          productName: name as string,
+          commenterName: userProfile.full_name || 'Someone',
+          commentPreview: formatCommentForEmail(commentItem.comments[0].content),
+          toolUrl,
+        });
+        const to =
+          process.env.NODE_ENV === 'development'
+            ? ['sididev3@gmail.com', 'nazar@marsx.dev']
+            : email;
 
-        sendNotification(email, slug as string, name as string, userProfile.full_name, commentItem.comments[0].content, getToken);
+        sendTasks.push(
+          resend.emails.send({
+            from: 'DevHunt <hey@devhunt.org>',
+            to,
+            subject: `New comment on ${name} · DevHunt`,
+            replyTo: 'hey@devhunt.org',
+            html,
+          }),
+        );
         sentEmails.add(email);
       }
-    });
+    }
+
+    await Promise.all(sendTasks);
 
     await initCommentLogsService.insertCommentLogs({ comments_number: groups.length, emails_sent: sentEmails.size });
   }
