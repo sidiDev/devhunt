@@ -38,6 +38,11 @@ const nextConfig = {
         hostname: 'ph-files.imgix.net',
         port: '',
       },
+      {
+        protocol: 'https',
+        hostname: 'assets.seobotai.com',
+        pathname: '/**',
+      },
     ],
   },
 };
