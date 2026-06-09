@@ -1,4 +1,5 @@
 import baseTemplate from '@/utils/email-templates/new-tools-launch-reminder-email-template';
+import { applyEmailSponsorAd } from '@/utils/email-templates/email-sponsor-ad';
 import { minifyEmailHtml } from '@/utils/email-templates/minify-email-html';
 
 const START_MARKER = '<!-- START OF CONTENT -->';
@@ -55,5 +56,5 @@ export function renderNewToolsLaunchReminderEmail(tools: LaunchReminderToolInput
       ? '<p style="color:#94a3b8;font-family:Helvetica,Arial,sans-serif;font-size:16px;padding:12px 15px">No tools scheduled for this launch week yet.</p>'
       : tools.map(t => fillOneToolBlock(toolBlock, t)).join('');
 
-  return minifyEmailHtml(`${before}${toolsHtml}${after}`);
+  return minifyEmailHtml(applyEmailSponsorAd(`${before}${toolsHtml}${after}`));
 }

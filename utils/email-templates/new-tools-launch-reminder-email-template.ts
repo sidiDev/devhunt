@@ -908,6 +908,7 @@ export default `
         </tr>
       </tbody>
     </table>
+    <!-- START OF SPONSOR AD -->
     <table
       id="Layout56"
       class="ReadMsgBody tgOuter"
@@ -968,7 +969,7 @@ export default `
                           >
                             <span class="mcEditImg" style="position: relative"
                               ><a
-                                href="https://e.sensorpro.net/run/Url.aspx?m1=DZ.cDUKBhlmH3BaI2T2yTJcPnofJ.HvA8MXi2au8ybQ9CiQVLPztuY.M.Q5ftKxOSZXE4Dv1u-o_hdtd_etha7ae|CjfKiQr3IiFVHIyO-ckQX9..79LMMnnDpOmJ2x1wyeNmiP-t516OELLPrORZ61TF_hdtd_zd&d2=&l1=1085951"
+                                href="{{adBannerLinkUrl}}"
                                 target="_blank"
                                 rel="noopener"
                                 ><img
@@ -981,7 +982,7 @@ export default `
                                     min-width: 600px;
                                     max-height: 300px;
                                   "
-                                  src="https://e.sensorpro.net/organization/devhunt/Images/listingbott_banner-2.png"
+                                  src="{{adBannerImageUrl}}"
                                   alt=""
                                   width="600"
                                   height="300"
@@ -1010,10 +1011,7 @@ export default `
                                 color: rgb(241, 245, 249);
                               "
                               spellcheck="false"
-                              ><strong
-                                >Submit Website To Directories with
-                                ListingBott</strong
-                              ></span
+                              ><strong>{{adTitle}}</strong></span
                             >
                           </td>
                         </tr>
@@ -1039,10 +1037,7 @@ export default `
                                 color: rgb(255, 255, 255);
                               "
                               spellcheck="false"
-                              >ListingBott - your SaaS, tool, product,
-                              newsletter, or blog listed on 100+ directories in
-                              one click, saving you days of work to focus on
-                              more creative tasks.</span
+                              >{{adDescription}}</span
                             >
                           </td>
                         </tr>
@@ -1105,11 +1100,11 @@ export default `
                                                 position: relative;
                                               "
                                               spellcheck="false"
-                                              href="https://e.sensorpro.net/run/Url.aspx?m1=DZ.cDUKBhlmH3BaI2T2yTJcPnofJ.HvA8MXi2au8ybQ9CiQVLPztuY.M.Q5ftKxOSZXE4Dv1u-o_hdtd_etha7ae|CjfKiQr3IiFVHIyO-ckQX9..79LMMnnDpOmJ2x1wyeNmiP-t516OELLPrORZ61TF_hdtd_zd&d2=&l1=1085951"
+                                              href="{{adCtaLinkUrl}}"
                                               target="_blank"
                                               rel="noopener noreferrer"
                                               title=""
-                                              >Learn More ›</a
+                                              >{{adCtaText}}</a
                                             >
                                           </td>
                                         </tr>
@@ -1132,6 +1127,7 @@ export default `
         </tr>
       </tbody>
     </table>
+    <!-- END OF SPONSOR AD -->
     <table
       id="Layout19"
       class="ReadMsgBody tgOuter"
